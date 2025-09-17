@@ -83,11 +83,16 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
   useEffect(() => {
     const slots = generateTimeSlots()
     const updatedSlots = slots.map((slot) => {
-      const isReserved = reservations.some((reservation) => reservation.start_time === slot.time)
+      // Aquí está la parte corregida para comparar solo horas y minutos
+      const isReserved = reservations.some((reservation) =>
+        reservation.start_time.substring(0, 5) === slot.time
+      )
       return {
         ...slot,
         available: !isReserved,
-        reservationId: isReserved ? reservations.find((r) => r.start_time === slot.time)?.id : undefined,
+        reservationId: isReserved
+          ? reservations.find((r) => r.start_time.substring(0, 5) === slot.time)?.id
+          : undefined,
       }
     })
     console.log(
