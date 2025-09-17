@@ -2,11 +2,12 @@ import type { Metadata } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { Analytics } from '@vercel/analytics/next'
+import { Suspense } from 'react'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
+  title: 'CourtBook',
+  description: 'Created by ovifernandez & podolski',
   generator: 'v0.app',
 }
 
@@ -18,7 +19,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        {children}
+        {/* Suspense boundary para hooks de navegación como useSearchParams */}
+        <Suspense fallback={<div />}>
+          {children}
+        </Suspense>
         <Analytics />
       </body>
     </html>

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import type { Court, Reservation, TimeSlot } from "@/lib/types"
+import { AlertModal } from "@/components/ui/alert-modal"
 
 interface TimeSlotBookingProps {
   court: Court
@@ -16,6 +17,14 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
   const [selectedSlots, setSelectedSlots] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [reservations, setReservations] = useState<Reservation[]>([])
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalMsg, setModalMsg] = useState("")
+
+  // Helper para convertir "HH:MM" a minutos desde medianoche
+  const timeToMinutes = (timeStr: string) => {
+    const [hours, minutes] = timeStr.split(":").map(Number)
+    return hours * 60 + minutes
+  }
 
   const generateTimeSlots = (): TimeSlot[] => {
     const slots: TimeSlot[] = []
@@ -33,39 +42,78 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
         available: true,
       })
     }
-
     return slots
   }
 
-  // Load reservations for the selected date
+  const loadReservations = async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("reservations")
+      .select("*")
+      .eq("court_id", court.id)
+      .eq("date", selectedDate)
+      .eq("status", "active")
+
+    console.log("[v0] Loaded reservations for date:", selectedDate, data)
+    setReservations(data || [])
+  }
+
+  // Load reservations for selected date and court
   useEffect(() => {
-    const loadReservations = async () => {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from("reservations")
-        .select("*")
-        .eq("court_id", court.id)
-        .eq("date", selectedDate)
-        .eq("status", "active")
-
-      console.log("[v0] Loaded reservations for date:", selectedDate, data)
-      setReservations(data || [])
-    }
-
     loadReservations()
   }, [court.id, selectedDate])
 
-  // Update time slots availability based on reservations
+  // Subscribe to realtime changes in reservations for the current court and date
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel("reservation-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "reservations",
+          filter: `court_id=eq.${court.id},date=eq.${selectedDate}`,
+        },
+        (payload) => {
+          console.log("[Realtime] Cambio en reservas recibido:", payload)
+          loadReservations() // Refresh reservations on any change
+        }
+      )
+      .subscribe()
+
+    return () => {
+      channel.unsubscribe()
+    }
+  }, [court.id, selectedDate])
+
+  // Update time slots availability based on reservations (CORREGIDO PARA RANGOS)
   useEffect(() => {
     const slots = generateTimeSlots()
+
     const updatedSlots = slots.map((slot) => {
-      const isReserved = reservations.some((reservation) => reservation.start_time === slot.time)
+      const slotMinutes = timeToMinutes(slot.time)
+      const isReserved = reservations.some((reservation) => {
+        const resStart = timeToMinutes(reservation.start_time.substring(0, 5))
+        const resEnd = timeToMinutes(reservation.end_time.substring(0, 5))
+        // Marca como ocupado si el slot está dentro del rango [start_time, end_time)
+        return slotMinutes >= resStart && slotMinutes < resEnd
+      })
+
       return {
         ...slot,
         available: !isReserved,
-        reservationId: isReserved ? reservations.find((r) => r.start_time === slot.time)?.id : undefined,
+        reservationId: isReserved
+          ? reservations.find((r) => {
+              const resStart = timeToMinutes(r.start_time.substring(0, 5))
+              const resEnd = timeToMinutes(r.end_time.substring(0, 5))
+              return slotMinutes >= resStart && slotMinutes < resEnd
+            })?.id
+          : undefined,
       }
     })
+    
     console.log(
       "[v0] Updated slots availability:",
       updatedSlots.filter((s) => !s.available),
@@ -73,9 +121,9 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
     setTimeSlots(updatedSlots)
   }, [reservations])
 
-  const handleSlotClick = (time: string, available: boolean) => {
-    if (!available) {
-      console.log("[v0] Slot not available:", time)
+  const handleSlotClick = (time: string, available: boolean, isPast: boolean) => {
+    if (!available || isPast) {
+      console.log("[v0] Slot not available or in the past:", time)
       return
     }
 
@@ -168,11 +216,13 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
 
       setSelectedSlots([])
 
-      // Show success message
-      alert("¡Reserva confirmada exitosamente!")
+      // Show success message with modal
+      setModalMsg("¡Reserva confirmada exitosamente!")
+      setModalOpen(true)
     } catch (error) {
       console.error("Error al reservar:", error)
-      alert("Error al crear la reserva. Por favor, inténtalo de nuevo.")
+      setModalMsg("Error al crear la reserva. Por favor, inténtalo de nuevo.")
+      setModalOpen(true)
     } finally {
       setIsLoading(false)
     }
@@ -192,6 +242,11 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
   const formatDate = (date: Date) => {
     return date.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" })
   }
+
+  // Obtener hora actual para comparar con slots del día actual
+  const now = new Date()
+  const currentTime = now.toTimeString().slice(0, 5) // "HH:MM"
+  const isToday = selectedDate === now.toISOString().split("T")[0]
 
   return (
     <div className="space-y-6">
@@ -230,7 +285,7 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
             {getNextDays(7).map((date) => {
               const dateString = date.toISOString().split("T")[0]
               const isSelected = selectedDate === dateString
-              const isToday = dateString === new Date().toISOString().split("T")[0]
+              const isDateToday = dateString === new Date().toISOString().split("T")[0]
 
               return (
                 <Button
@@ -244,7 +299,7 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
                 >
                   <div className="text-center">
                     <div className="text-xs">{formatDate(date)}</div>
-                    {isToday && <div className="text-xs opacity-75">Hoy</div>}
+                    {isDateToday && <div className="text-xs opacity-75">Hoy</div>}
                   </div>
                 </Button>
               )
@@ -264,25 +319,30 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
             {timeSlots.map((slot) => {
               const isSelected = selectedSlots.includes(slot.time)
               const isAvailable = slot.available
+              
+              // AQUÍ SE APLICA LA LÓGICA PARA SLOTS PASADOS
+              const isPast = isToday && timeToMinutes(slot.time) <= timeToMinutes(currentTime)
 
               return (
                 <Button
                   key={slot.time}
-                  variant={isSelected ? "default" : isAvailable ? "outline" : "secondary"}
+                  variant={isSelected ? "default" : isAvailable && !isPast ? "outline" : "secondary"}
                   size="sm"
-                  onClick={() => handleSlotClick(slot.time, isAvailable)}
-                  disabled={!isAvailable}
+                  onClick={() => handleSlotClick(slot.time, isAvailable, isPast)}
+                  disabled={!isAvailable || isPast}
                   className={`h-12 ${
                     isSelected
                       ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                      : isAvailable
-                        ? "border-emerald-200 hover:bg-emerald-50 text-slate-700"
-                        : "bg-red-100 text-red-600 cursor-not-allowed hover:bg-red-100"
+                      : isAvailable && !isPast
+                      ? "border-emerald-200 hover:bg-emerald-50 text-slate-700"
+                      : "bg-red-100 text-red-600 cursor-not-allowed hover:bg-red-100"
                   }`}
                 >
                   <div className="text-center">
                     <div className="font-medium">{slot.time}</div>
-                    <div className="text-xs opacity-75">{isAvailable ? "Libre" : "Ocupado"}</div>
+                    <div className="text-xs opacity-75">
+                      {isPast ? "Pasado" : isAvailable ? "Libre" : "Ocupado"}
+                    </div>
                   </div>
                 </Button>
               )
@@ -310,6 +370,14 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal estilo Apple */}
+      <AlertModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title="Reserva"
+        message={modalMsg}
+      />
     </div>
   )
 }
