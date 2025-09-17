@@ -68,7 +68,7 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
           filter: `court_id=eq.${court.id},date=eq.${selectedDate}`,
         },
         (payload) => {
-          console.log("[v0] Realtime reservation change received:", payload)
+          console.log("[Realtime] Cambio en reservas recibido:", payload)
           loadReservations() // Refresh reservations on any change
         }
       )
@@ -83,7 +83,7 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
   useEffect(() => {
     const slots = generateTimeSlots()
     const updatedSlots = slots.map((slot) => {
-      // Aquí está la parte corregida para comparar solo horas y minutos
+      // Comparar solo las primeras 5 posiciones (hora y minutos)
       const isReserved = reservations.some((reservation) =>
         reservation.start_time.substring(0, 5) === slot.time
       )
