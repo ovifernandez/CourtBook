@@ -16,43 +16,79 @@ export function UserReservations({ reservations: initialReservations }: UserRese
   const [reservations, setReservations] = useState(initialReservations)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
 
+  const supabase = createClient()
+
+  // Obtener usuario autenticado y establecer userId
   useEffect(() => {
-    const refreshReservations = async () => {
-      setIsLoading(true)
-      const supabase = createClient()
-
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-        if (!user) return
-
-        const { data: updatedReservations } = await supabase
-          .from("reservations")
-          .select(`
-            *,
-            court:courts(*)
-          `)
-          .eq("user_id", user.id)
-          .order("date", { ascending: true })
-          .order("start_time", { ascending: true })
-
-        if (updatedReservations) {
-          setReservations(updatedReservations)
-        }
-      } catch (error) {
-        console.error("Error refreshing reservations:", error)
-      } finally {
-        setIsLoading(false)
+    const fetchUser = async () => {
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser()
+      if (error) {
+        console.error("Error al obtener usuario:", error)
+        return
       }
+      if (user) setUserId(user.id)
     }
+    fetchUser()
+  }, [supabase])
+
+  // Función para refrescar reservas desde la base de datos
+  const refreshReservations = async () => {
+    if (!userId) return
+    setIsLoading(true)
+
+    try {
+      const { data: updatedReservations } = await supabase
+        .from("reservations")
+        .select(`
+          *,
+          court:courts(*)
+        `)
+        .eq("user_id", userId)
+        .order("date", { ascending: true })
+        .order("start_time", { ascending: true })
+
+      if (updatedReservations) {
+        setReservations(updatedReservations)
+      }
+    } catch (error) {
+      console.error("Error refreshing reservations:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Inicial load y suscripción realtime a cambios en las reservas del usuario
+  useEffect(() => {
+    if (!userId) return
 
     refreshReservations()
-    const interval = setInterval(refreshReservations, 30000)
+    const channel = supabase
+      .channel("user-reservations")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "reservations",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          console.log("[Realtime] Reserva cambiada:", payload)
+          refreshReservations()
+        }
+      )
+      .subscribe()
 
-    return () => clearInterval(interval)
-  }, [])
+    // Limpieza al desmontar
+    return () => {
+      channel.unsubscribe()
+    }
+  }, [userId, supabase])
 
   const today = new Date().toISOString().split("T")[0]
   const now = new Date()
@@ -70,15 +106,14 @@ export function UserReservations({ reservations: initialReservations }: UserRese
 
   const handleCancelReservation = async (reservationId: string) => {
     setCancellingId(reservationId)
-    const supabase = createClient()
 
     try {
       const { error } = await supabase.from("reservations").update({ status: "cancelled" }).eq("id", reservationId)
-
       if (error) throw error
 
-      setReservations(
-        reservations.map((reservation) =>
+      // No es obligatorio actualizar localmente porque lo hace el realtime, pero por UX se puede hacer:
+      setReservations((prev) =>
+        prev.map((reservation) =>
           reservation.id === reservationId ? { ...reservation, status: "cancelled" as const } : reservation,
         ),
       )
@@ -112,6 +147,7 @@ export function UserReservations({ reservations: initialReservations }: UserRese
       return <Badge variant="destructive">Cancelada</Badge>
     }
 
+    const now = new Date()
     const reservationDate = new Date(`${reservation.date}T${reservation.start_time}`)
     if (reservationDate < now) {
       return <Badge variant="secondary">Completada</Badge>
@@ -119,6 +155,8 @@ export function UserReservations({ reservations: initialReservations }: UserRese
 
     return <Badge className="bg-emerald-100 text-emerald-700">Activa</Badge>
   }
+
+  const isTennis = (reservation: Reservation & { court: any }) => reservation.court?.type === "tennis"
 
   return (
     <div className="space-y-8">
@@ -139,13 +177,9 @@ export function UserReservations({ reservations: initialReservations }: UserRese
           <Card>
             <CardContent className="py-12 text-center">
               <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                {/* Icono */}
                 <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
               </div>
               <h3 className="text-lg font-medium text-slate-800 mb-2">No tienes reservas próximas</h3>
@@ -244,12 +278,7 @@ function ReservationCard({ reservation, onCancel, isCancelling, showCancelButton
                 stroke="currentColor"
                 viewBox="0 0 24 24"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             <div>
@@ -265,12 +294,7 @@ function ReservationCard({ reservation, onCancel, isCancelling, showCancelButton
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span>
                 {formatTime(reservation.start_time)} - {formatTime(reservation.end_time)}
@@ -278,12 +302,7 @@ function ReservationCard({ reservation, onCancel, isCancelling, showCancelButton
             </div>
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
               <span>Reserva #{reservation.id.slice(-8)}</span>
             </div>
