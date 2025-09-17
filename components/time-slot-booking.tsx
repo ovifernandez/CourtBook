@@ -33,26 +33,50 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
         available: true,
       })
     }
-
     return slots
   }
 
-  // Load reservations for the selected date
+  const loadReservations = async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("reservations")
+      .select("*")
+      .eq("court_id", court.id)
+      .eq("date", selectedDate)
+      .eq("status", "active")
+
+    console.log("[v0] Loaded reservations for date:", selectedDate, data)
+    setReservations(data || [])
+  }
+
+  // Load reservations for selected date and court
   useEffect(() => {
-    const loadReservations = async () => {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from("reservations")
-        .select("*")
-        .eq("court_id", court.id)
-        .eq("date", selectedDate)
-        .eq("status", "active")
-
-      console.log("[v0] Loaded reservations for date:", selectedDate, data)
-      setReservations(data || [])
-    }
-
     loadReservations()
+  }, [court.id, selectedDate])
+
+  // Subscribe to realtime changes in reservations for the current court and date
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel("reservation-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "reservations",
+          filter: `court_id=eq.${court.id},date=eq.${selectedDate}`,
+        },
+        (payload) => {
+          console.log("[v0] Realtime reservation change received:", payload)
+          loadReservations() // Refresh reservations on any change
+        }
+      )
+      .subscribe()
+
+    return () => {
+      channel.unsubscribe()
+    }
   }, [court.id, selectedDate])
 
   // Update time slots availability based on reservations
@@ -276,8 +300,8 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
                     isSelected
                       ? "bg-emerald-600 hover:bg-emerald-700 text-white"
                       : isAvailable
-                        ? "border-emerald-200 hover:bg-emerald-50 text-slate-700"
-                        : "bg-red-100 text-red-600 cursor-not-allowed hover:bg-red-100"
+                      ? "border-emerald-200 hover:bg-emerald-50 text-slate-700"
+                      : "bg-red-100 text-red-600 cursor-not-allowed hover:bg-red-100"
                   }`}
                 >
                   <div className="text-center">
