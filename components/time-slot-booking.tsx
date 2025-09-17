@@ -82,28 +82,39 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
     }
   }, [court.id, selectedDate])
 
-  // Update time slots availability based on reservations
-  useEffect(() => {
-    const slots = generateTimeSlots()
-    const updatedSlots = slots.map((slot) => {
-      // Comparar solo las primeras 5 posiciones (hora y minutos)
-      const isReserved = reservations.some((reservation) =>
-        reservation.start_time.substring(0, 5) === slot.time
-      )
-      return {
-        ...slot,
-        available: !isReserved,
-        reservationId: isReserved
-          ? reservations.find((r) => r.start_time.substring(0, 5) === slot.time)?.id
-          : undefined,
-      }
+useEffect(() => {
+  const slots = generateTimeSlots()
+
+  const updatedSlots = slots.map((slot, idx, arr) => {
+    // Convierte a minutos desde medianoche para comparar rápidamente
+    const slotMinutes = mins(slot.time)
+    const isReserved = reservations.some((reservation) => {
+      const resStart = mins(reservation.start_time.substring(0, 5))
+      const resEnd = mins(reservation.end_time.substring(0, 5))
+      // Ocupa todos los slots con principio >= start_time y < end_time
+      return slotMinutes >= resStart && slotMinutes < resEnd
     })
-    console.log(
-      "[v0] Updated slots availability:",
-      updatedSlots.filter((s) => !s.available),
-    )
-    setTimeSlots(updatedSlots)
-  }, [reservations])
+    return {
+      ...slot,
+      available: !isReserved,
+      reservationId: isReserved
+        ? reservations.find((r) => {
+            const resStart = mins(r.start_time.substring(0, 5))
+            const resEnd = mins(r.end_time.substring(0, 5))
+            return slotMinutes >= resStart && slotMinutes < resEnd
+          })?.id
+        : undefined,
+    }
+  })
+  setTimeSlots(updatedSlots)
+
+  // Helper para convertir "HH:MM" a minutos
+  function mins(str) {
+    const [h, m] = str.split(":").map(Number)
+    return h * 60 + m
+  }
+}, [reservations])
+
 
   const handleSlotClick = (time: string, available: boolean) => {
     if (!available) {
