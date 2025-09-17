@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
 import type { Reservation } from "@/lib/types"
 import Link from "next/link"
+import { AlertModal } from "@/components/ui/alert-modal"
 
 interface UserReservationsProps {
   reservations: (Reservation & { court: any })[]
@@ -17,11 +18,13 @@ export function UserReservations({ reservations: initialReservations }: UserRese
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
-  const [now, setNow] = useState<Date>(() => new Date()) // “reloj” interno
+  const [now, setNow] = useState<Date>(() => new Date()) // "reloj" interno
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalMsg, setModalMsg] = useState("")
 
   const supabase = createClient()
 
-  /* -------------------- 1. ACTUALIZAR ‘now’ A MEDIANOCHE ------------------- */
+  /* -------------------- 1. ACTUALIZAR 'now' A MEDIANOCHE ------------------- */
   useEffect(() => {
     const msUntilMidnight =
       new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime()
@@ -105,9 +108,13 @@ export function UserReservations({ reservations: initialReservations }: UserRese
       if (error) throw error
       // Optimista: marcar como cancelada localmente, realtime hará el resto
       setReservations((prev) => prev.map((r) => (r.id === id ? { ...r, status: "cancelled" } : r)))
+      
+      setModalMsg("Reserva cancelada exitosamente")
+      setModalOpen(true)
     } catch (error) {
       console.error("Error al cancelar reserva:", error)
-      alert("No se pudo cancelar la reserva. Inténtalo de nuevo.")
+      setModalMsg("Error al cancelar la reserva. Inténtalo de nuevo.")
+      setModalOpen(true)
     } finally {
       setCancellingId(null)
     }
@@ -191,6 +198,14 @@ export function UserReservations({ reservations: initialReservations }: UserRese
           </div>
         </section>
       )}
+
+      {/* Modal estilo Apple */}
+      <AlertModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title="Reserva"
+        message={modalMsg}
+      />
     </div>
   )
 }
