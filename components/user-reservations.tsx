@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
 import type { Reservation } from "@/lib/types"
 import Link from "next/link"
-import { AlertModal } from "@/components/ui/alert-modal"
 
 interface UserReservationsProps {
   reservations: (Reservation & { court: any })[]
@@ -17,219 +16,216 @@ export function UserReservations({ reservations: initialReservations }: UserRese
   const [reservations, setReservations] = useState(initialReservations)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [userId, setUserId] = useState<string | null>(null)
-  const [now, setNow] = useState<Date>(() => new Date()) // "reloj" interno
-  const [modalOpen, setModalOpen] = useState(false)
-  const [modalMsg, setModalMsg] = useState("")
 
-  const supabase = createClient()
-
-  /* -------------------- 1. ACTUALIZAR 'now' A MEDIANOCHE ------------------- */
   useEffect(() => {
-    const msUntilMidnight =
-      new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime()
+    const refreshReservations = async () => {
+      setIsLoading(true)
+      const supabase = createClient()
 
-    const timer = setTimeout(() => setNow(new Date()), msUntilMidnight)
-    return () => clearTimeout(timer)
-  }, [now])
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (!user) return
 
-  /* ----------------------- 2. OBTENER USUARIO ACTIVO ----------------------- */
-  useEffect(() => {
-    const getUser = async () => {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser()
-      if (error) console.error("Error al obtener usuario:", error)
-      if (user) setUserId(user.id)
+        const { data: updatedReservations } = await supabase
+          .from("reservations")
+          .select(`
+            *,
+            court:courts(*)
+          `)
+          .eq("user_id", user.id)
+          .order("date", { ascending: true })
+          .order("start_time", { ascending: true })
+
+        if (updatedReservations) {
+          setReservations(updatedReservations)
+        }
+      } catch (error) {
+        console.error("Error refreshing reservations:", error)
+      } finally {
+        setIsLoading(false)
+      }
     }
-    getUser()
-  }, [supabase])
 
-  /* ------------------ 3. CARGAR / REFRESCAR RESERVAS ---------------------- */
-  const refreshReservations = async () => {
-    if (!userId) return
-    setIsLoading(true)
-    try {
-      const { data } = await supabase
-        .from("reservations")
-        .select(`*, court:courts(*)`)
-        .eq("user_id", userId)
-        .order("date", { ascending: true })
-        .order("start_time", { ascending: true })
-
-      if (data) setReservations(data)
-    } catch (error) {
-      console.error("Error refreshing reservations:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  /* -------- 4. SUSCRIPCIÓN REALTIME A CAMBIOS EN RESERVAS DEL USUARIO ------ */
-  useEffect(() => {
-    if (!userId) return
     refreshReservations()
+    const interval = setInterval(refreshReservations, 30000)
 
-    const channel = supabase
-      .channel("user-reservations")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "reservations", filter: `user_id=eq.${userId}` },
-        () => refreshReservations(),
-      )
-      .subscribe()
+    return () => clearInterval(interval)
+  }, [])
 
-    return () => channel.unsubscribe()
-  }, [userId, supabase])
+  const today = new Date().toISOString().split("T")[0]
+  const now = new Date()
 
-  /* --------------------------- 5. FILTROS UI ------------------------------ */
-  const sevenDaysAhead = new Date(now)
-  sevenDaysAhead.setDate(now.getDate() + 7)
-
-  // Próximas (máx. 7 días, activas)
-  const upcomingReservations = reservations.filter((r) => {
-    if (r.status !== "active") return false
-    const date = new Date(`${r.date}T${r.start_time}`)
-    return date >= now && date <= sevenDaysAhead
+  const upcomingReservations = reservations.filter((reservation) => {
+    if (reservation.status === "cancelled") return false
+    const reservationDate = new Date(`${reservation.date}T${reservation.start_time}`)
+    return reservationDate >= now
   })
 
-  // Pasadas (cualquier estado) - solo fechas anteriores a hoy
-  const pastReservations = reservations.filter((r) => {
-    const date = new Date(`${r.date}T${r.start_time}`)
-    return date < now
+  const pastReservations = reservations.filter((reservation) => {
+    const reservationDate = new Date(`${reservation.date}T${reservation.start_time}`)
+    return reservationDate < now || reservation.status === "cancelled"
   })
 
-  /* --------------------- 6. CANCELAR RESERVA (UPDATE) --------------------- */
-  const handleCancelReservation = async (id: string) => {
-    setCancellingId(id)
+  const handleCancelReservation = async (reservationId: string) => {
+    setCancellingId(reservationId)
+    const supabase = createClient()
+
     try {
-      const { error } = await supabase.from("reservations").update({ status: "cancelled" }).eq("id", id)
+      const { error } = await supabase.from("reservations").update({ status: "cancelled" }).eq("id", reservationId)
+
       if (error) throw error
-      // Optimista: marcar como cancelada localmente, realtime hará el resto
-      setReservations((prev) => prev.map((r) => (r.id === id ? { ...r, status: "cancelled" } : r)))
-      
-      setModalMsg("Reserva cancelada exitosamente")
-      setModalOpen(true)
+
+      setReservations(
+        reservations.map((reservation) =>
+          reservation.id === reservationId ? { ...reservation, status: "cancelled" as const } : reservation,
+        ),
+      )
+
+      console.log("[v0] Reservation cancelled successfully:", reservationId)
+      alert("Reserva cancelada exitosamente")
     } catch (error) {
       console.error("Error al cancelar reserva:", error)
-      setModalMsg("Error al cancelar la reserva. Inténtalo de nuevo.")
-      setModalOpen(true)
+      alert("Error al cancelar la reserva. Por favor, inténtalo de nuevo.")
     } finally {
       setCancellingId(null)
     }
   }
 
-  /* ---------------------------- 7. HELPERS UI ----------------------------- */
-  const formatDate = (d: string) =>
-    new Date(d).toLocaleDateString("es-ES", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString("es-ES", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
+  }
 
-  const formatTime = (t: string) => t.slice(0, 5)
+  const formatTime = (timeString: string) => {
+    return timeString.slice(0, 5) // Remove seconds
+  }
 
-  const badgeFor = (r: Reservation & { court: any }) => {
-    const date = new Date(`${r.date}T${r.start_time}`)
-    if (r.status === "cancelled") return <Badge variant="destructive">Cancelada</Badge>
-    if (date < now) return <Badge variant="secondary">Completada</Badge>
+  const getStatusBadge = (reservation: Reservation & { court: any }) => {
+    if (reservation.status === "cancelled") {
+      return <Badge variant="destructive">Cancelada</Badge>
+    }
+
+    const reservationDate = new Date(`${reservation.date}T${reservation.start_time}`)
+    if (reservationDate < now) {
+      return <Badge variant="secondary">Completada</Badge>
+    }
+
     return <Badge className="bg-emerald-100 text-emerald-700">Activa</Badge>
   }
 
-  /* ------------------------------ 8. RENDER ------------------------------- */
   return (
     <div className="space-y-8">
-      {/* Encabezado */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-800">Mis Reservas</h1>
           <p className="text-slate-600">Gestiona tus reservas de pistas</p>
-          {isLoading && <p className="text-sm text-emerald-600">Actualizando…</p>}
+          {isLoading && <p className="text-sm text-emerald-600">Actualizando reservas...</p>}
         </div>
         <Button asChild className="bg-emerald-600 hover:bg-emerald-700 text-white">
           <Link href="/dashboard">Nueva Reserva</Link>
         </Button>
       </div>
 
-      {/* Próximas */}
-      <section>
-        <h2 className="text-2xl font-bold text-slate-800 mb-6">Próximas (≤ 7 días)</h2>
+      <div>
+        <h2 className="text-2xl font-bold text-slate-800 mb-6">Próximas Reservas</h2>
         {upcomingReservations.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
-              <p className="text-slate-600">No hay reservas próximas.</p>
-              <Button asChild className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white">
+              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-slate-800 mb-2">No tienes reservas próximas</h3>
+              <p className="text-slate-600 mb-4">¡Reserva una pista para empezar a jugar!</p>
+              <Button asChild className="bg-emerald-600 hover:bg-emerald-700 text-white">
                 <Link href="/dashboard">Hacer Reserva</Link>
               </Button>
             </CardContent>
           </Card>
         ) : (
           <div className="grid gap-4">
-            {upcomingReservations.map((r) => (
+            {upcomingReservations.map((reservation) => (
               <ReservationCard
-                key={r.id}
-                reservation={r}
+                key={reservation.id}
+                reservation={reservation}
                 onCancel={handleCancelReservation}
-                isCancelling={cancellingId === r.id}
-                showCancelButton
-                badgeFor={badgeFor}
-                formatDate={formatDate}
-                formatTime={formatTime}
+                isCancelling={cancellingId === reservation.id}
+                showCancelButton={true}
               />
             ))}
           </div>
         )}
-      </section>
+      </div>
 
-      {/* Historial */}
       {pastReservations.length > 0 && (
-        <section>
-          <h2 className="text-2xl font-bold text-slate-800 mb-6">Historial</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 mb-6">Historial de Reservas</h2>
           <div className="grid gap-4">
-            {pastReservations.map((r) => (
+            {pastReservations.map((reservation) => (
               <ReservationCard
-                key={r.id}
-                reservation={r}
+                key={reservation.id}
+                reservation={reservation}
                 onCancel={handleCancelReservation}
                 isCancelling={false}
                 showCancelButton={false}
-                badgeFor={badgeFor}
-                formatDate={formatDate}
-                formatTime={formatTime}
               />
             ))}
           </div>
-        </section>
+        </div>
       )}
-
-      {/* Modal estilo Apple */}
-      <AlertModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title="Reserva"
-        message={modalMsg}
-      />
     </div>
   )
 }
 
-/* ----------------------- Card reutilizable ----------------------- */
 interface ReservationCardProps {
   reservation: Reservation & { court: any }
   onCancel: (id: string) => void
   isCancelling: boolean
   showCancelButton: boolean
-  badgeFor: (r: Reservation & { court: any }) => JSX.Element
-  formatDate: (d: string) => string
-  formatTime: (t: string) => string
 }
 
-function ReservationCard({
-  reservation,
-  onCancel,
-  isCancelling,
-  showCancelButton,
-  badgeFor,
-  formatDate,
-  formatTime,
-}: ReservationCardProps) {
+function ReservationCard({ reservation, onCancel, isCancelling, showCancelButton }: ReservationCardProps) {
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString("es-ES", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
+  }
+
+  const formatTime = (timeString: string) => {
+    return timeString.slice(0, 5) // Remove seconds
+  }
+
+  const getStatusBadge = (reservation: Reservation & { court: any }) => {
+    if (reservation.status === "cancelled") {
+      return <Badge variant="destructive">Cancelada</Badge>
+    }
+
+    const now = new Date()
+    const reservationDate = new Date(`${reservation.date}T${reservation.start_time}`)
+    if (reservationDate < now) {
+      return <Badge variant="secondary">Completada</Badge>
+    }
+
+    return <Badge className="bg-emerald-100 text-emerald-700">Activa</Badge>
+  }
+
   const isTennis = reservation.court?.type === "tennis"
 
   return (
@@ -248,7 +244,12 @@ function ReservationCard({
                 stroke="currentColor"
                 viewBox="0 0 24 24"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
             </div>
             <div>
@@ -256,30 +257,38 @@ function ReservationCard({
               <CardDescription className="text-slate-600">{formatDate(reservation.date)}</CardDescription>
             </div>
           </div>
-          {badgeFor(reservation)}
+          {getStatusBadge(reservation)}
         </div>
       </CardHeader>
-
       <CardContent>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               <span>
-                {formatTime(reservation.start_time)} – {formatTime(reservation.end_time)}
+                {formatTime(reservation.start_time)} - {formatTime(reservation.end_time)}
               </span>
             </div>
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
               </svg>
-              <span>#{reservation.id.slice(-8)}</span>
+              <span>Reserva #{reservation.id.slice(-8)}</span>
             </div>
           </div>
-
-          {showCancelButton && (
+          {showCancelButton && reservation.status === "active" && (
             <Button
               variant="outline"
               size="sm"
@@ -287,7 +296,7 @@ function ReservationCard({
               disabled={isCancelling}
               className="border-red-200 text-red-600 hover:bg-red-50"
             >
-              {isCancelling ? "Cancelando…" : "Cancelar"}
+              {isCancelling ? "Cancelando..." : "Cancelar"}
             </Button>
           )}
         </div>
