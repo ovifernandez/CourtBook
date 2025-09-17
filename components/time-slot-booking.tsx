@@ -20,6 +20,12 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
   const [modalOpen, setModalOpen] = useState(false)
   const [modalMsg, setModalMsg] = useState("")
 
+  // Helper para convertir "HH:MM" a minutos desde medianoche
+  const timeToMinutes = (timeStr: string) => {
+    const [hours, minutes] = timeStr.split(":").map(Number)
+    return hours * 60 + minutes
+  }
+
   const generateTimeSlots = (): TimeSlot[] => {
     const slots: TimeSlot[] = []
     const startTime = 8.5 // 8:30
@@ -82,43 +88,42 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
     }
   }, [court.id, selectedDate])
 
-useEffect(() => {
-  const slots = generateTimeSlots()
+  // Update time slots availability based on reservations (CORREGIDO PARA RANGOS)
+  useEffect(() => {
+    const slots = generateTimeSlots()
 
-  const updatedSlots = slots.map((slot, idx, arr) => {
-    // Convierte a minutos desde medianoche para comparar rápidamente
-    const slotMinutes = mins(slot.time)
-    const isReserved = reservations.some((reservation) => {
-      const resStart = mins(reservation.start_time.substring(0, 5))
-      const resEnd = mins(reservation.end_time.substring(0, 5))
-      // Ocupa todos los slots con principio >= start_time y < end_time
-      return slotMinutes >= resStart && slotMinutes < resEnd
+    const updatedSlots = slots.map((slot) => {
+      const slotMinutes = timeToMinutes(slot.time)
+      const isReserved = reservations.some((reservation) => {
+        const resStart = timeToMinutes(reservation.start_time.substring(0, 5))
+        const resEnd = timeToMinutes(reservation.end_time.substring(0, 5))
+        // Marca como ocupado si el slot está dentro del rango [start_time, end_time)
+        return slotMinutes >= resStart && slotMinutes < resEnd
+      })
+
+      return {
+        ...slot,
+        available: !isReserved,
+        reservationId: isReserved
+          ? reservations.find((r) => {
+              const resStart = timeToMinutes(r.start_time.substring(0, 5))
+              const resEnd = timeToMinutes(r.end_time.substring(0, 5))
+              return slotMinutes >= resStart && slotMinutes < resEnd
+            })?.id
+          : undefined,
+      }
     })
-    return {
-      ...slot,
-      available: !isReserved,
-      reservationId: isReserved
-        ? reservations.find((r) => {
-            const resStart = mins(r.start_time.substring(0, 5))
-            const resEnd = mins(r.end_time.substring(0, 5))
-            return slotMinutes >= resStart && slotMinutes < resEnd
-          })?.id
-        : undefined,
-    }
-  })
-  setTimeSlots(updatedSlots)
+    
+    console.log(
+      "[v0] Updated slots availability:",
+      updatedSlots.filter((s) => !s.available),
+    )
+    setTimeSlots(updatedSlots)
+  }, [reservations])
 
-  // Helper para convertir "HH:MM" a minutos
-  function mins(str) {
-    const [h, m] = str.split(":").map(Number)
-    return h * 60 + m
-  }
-}, [reservations])
-
-
-  const handleSlotClick = (time: string, available: boolean) => {
-    if (!available) {
-      console.log("[v0] Slot not available:", time)
+  const handleSlotClick = (time: string, available: boolean, isPast: boolean) => {
+    if (!available || isPast) {
+      console.log("[v0] Slot not available or in the past:", time)
       return
     }
 
@@ -238,6 +243,11 @@ useEffect(() => {
     return date.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" })
   }
 
+  // Obtener hora actual para comparar con slots del día actual
+  const now = new Date()
+  const currentTime = now.toTimeString().slice(0, 5) // "HH:MM"
+  const isToday = selectedDate === now.toISOString().split("T")[0]
+
   return (
     <div className="space-y-6">
       <Card>
@@ -275,7 +285,7 @@ useEffect(() => {
             {getNextDays(7).map((date) => {
               const dateString = date.toISOString().split("T")[0]
               const isSelected = selectedDate === dateString
-              const isToday = dateString === new Date().toISOString().split("T")[0]
+              const isDateToday = dateString === new Date().toISOString().split("T")[0]
 
               return (
                 <Button
@@ -289,7 +299,7 @@ useEffect(() => {
                 >
                   <div className="text-center">
                     <div className="text-xs">{formatDate(date)}</div>
-                    {isToday && <div className="text-xs opacity-75">Hoy</div>}
+                    {isDateToday && <div className="text-xs opacity-75">Hoy</div>}
                   </div>
                 </Button>
               )
@@ -309,25 +319,30 @@ useEffect(() => {
             {timeSlots.map((slot) => {
               const isSelected = selectedSlots.includes(slot.time)
               const isAvailable = slot.available
+              
+              // AQUÍ SE APLICA LA LÓGICA PARA SLOTS PASADOS
+              const isPast = isToday && timeToMinutes(slot.time) <= timeToMinutes(currentTime)
 
               return (
                 <Button
                   key={slot.time}
-                  variant={isSelected ? "default" : isAvailable ? "outline" : "secondary"}
+                  variant={isSelected ? "default" : isAvailable && !isPast ? "outline" : "secondary"}
                   size="sm"
-                  onClick={() => handleSlotClick(slot.time, isAvailable)}
-                  disabled={!isAvailable}
+                  onClick={() => handleSlotClick(slot.time, isAvailable, isPast)}
+                  disabled={!isAvailable || isPast}
                   className={`h-12 ${
                     isSelected
                       ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                      : isAvailable
+                      : isAvailable && !isPast
                       ? "border-emerald-200 hover:bg-emerald-50 text-slate-700"
                       : "bg-red-100 text-red-600 cursor-not-allowed hover:bg-red-100"
                   }`}
                 >
                   <div className="text-center">
                     <div className="font-medium">{slot.time}</div>
-                    <div className="text-xs opacity-75">{isAvailable ? "Libre" : "Ocupado"}</div>
+                    <div className="text-xs opacity-75">
+                      {isPast ? "Pasado" : isAvailable ? "Libre" : "Ocupado"}
+                    </div>
                   </div>
                 </Button>
               )
