@@ -350,24 +350,43 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
           </div>
 
           {selectedSlots.length > 0 && (
-            <div className="mt-6 p-4 bg-emerald-50 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium text-slate-800">Reserva Seleccionada</h4>
-                  <p className="text-sm text-slate-600">
-                    {selectedSlots.sort().join(" - ")} ({selectedSlots.length * 1.5} horas)
-                  </p>
-                </div>
-                <Button
-                  onClick={handleBooking}
-                  disabled={isLoading}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                >
-                  {isLoading ? "Reservando..." : "Confirmar Reserva"}
-                </Button>
-              </div>
-            </div>
-          )}
+  <div className="mt-6 p-4 bg-emerald-50 rounded-lg">
+    {/* Desktop layout */}
+    <div className="hidden sm:flex items-center justify-between">
+      <div>
+        <h4 className="font-medium text-slate-800">Reserva Seleccionada</h4>
+        <p className="text-sm text-slate-600">
+          {selectedSlots.sort().join(" - ")} ({selectedSlots.length * 1.5} horas)
+        </p>
+      </div>
+      <Button
+        onClick={handleBooking}
+        disabled={isLoading}
+        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+      >
+        {isLoading ? "Reservando..." : "Confirmar Reserva"}
+      </Button>
+    </div>
+
+    {/* Mobile layout */}
+    <div className="sm:hidden space-y-4">
+      <div className="text-center">
+        <h4 className="font-medium text-slate-800">Reserva Seleccionada</h4>
+        <p className="text-sm text-slate-600">
+          {selectedSlots.sort().join(" - ")} ({selectedSlots.length * 1.5} horas)
+        </p>
+      </div>
+      <Button
+        onClick={handleBooking}
+        disabled={isLoading}
+        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+      >
+        {isLoading ? "Reservando..." : "Confirmar Reserva"}
+      </Button>
+    </div>
+  </div>
+)}
+
         </CardContent>
       </Card>
 
