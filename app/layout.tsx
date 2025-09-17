@@ -6,9 +6,18 @@ import { Suspense } from 'react'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'CourtBook',
-  description: 'Created by ovifernandez & podolski',
+  title: 'v0 App',
+  description: 'Created with v0',
   generator: 'v0.app',
+}
+
+// Componente wrapper cliente con Suspense
+function ClientWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Cargando...</div>}>
+      {children}
+    </Suspense>
+  )
 }
 
 export default function RootLayout({
@@ -19,10 +28,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        {/* Suspense boundary para hooks de navegación como useSearchParams */}
-        <Suspense fallback={<div />}>
+        <ClientWrapper>
           {children}
-        </Suspense>
+        </ClientWrapper>
         <Analytics />
       </body>
     </html>
