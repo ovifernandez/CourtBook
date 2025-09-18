@@ -82,6 +82,24 @@ export function UserReservations({ reservations: initialReservations }: UserRese
     return () => channel.unsubscribe()
   }, [supabase])
 
+  const handleCancel = async (id: string) => {
+    setCancellingId(id)
+    setIsLoading(true)
+    try {
+      const { error } = await supabase.from("reservations").update({ status: "cancelled" }).eq("id", id)
+      if (error) throw error
+      setModalMsg("Reservation cancelled successfully")
+      setModalOpen(true)
+      refreshReservations()
+    } catch (error: any) {
+      setModalMsg(error.message || "Error cancelling reservation")
+      setModalOpen(true)
+    } finally {
+      setIsLoading(false)
+      setCancellingId(null)
+    }
+  }
+
   const sevenDaysAhead = new Date(now)
   sevenDaysAhead.setDate(now.getDate() + 7)
 
@@ -105,13 +123,13 @@ export function UserReservations({ reservations: initialReservations }: UserRese
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-800">Reservas</h1>
           <p className="text-slate-600">Todas las reservas para evitar solapamientos</p>
           {isLoading && <p className="text-sm text-emerald-600">Actualizando…</p>}
         </div>
-        <Button asChild className="bg-emerald-600 hover:bg-emerald-700 text-white">
+        <Button asChild className="w-full max-w-xs sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white">
           <Link href="/dashboard">Nueva Reserva</Link>
         </Button>
       </div>
@@ -133,9 +151,9 @@ export function UserReservations({ reservations: initialReservations }: UserRese
               <ReservationCard
                 key={reservation.id}
                 reservation={reservation}
-                onCancel={() => {}}
-                isCancelling={false}
-                showCancelButton={false}
+                onCancel={() => handleCancel(reservation.id)}
+                isCancelling={cancellingId === reservation.id}
+                showCancelButton={reservation.user_id === userId}
                 badgeFor={badgeFor}
                 formatDate={(d: string) => new Date(d).toLocaleDateString("es-ES", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
                 formatTime={(t: string) => t.slice(0, 5)}
@@ -153,9 +171,9 @@ export function UserReservations({ reservations: initialReservations }: UserRese
               <ReservationCard
                 key={reservation.id}
                 reservation={reservation}
-                onCancel={() => {}}
-                isCancelling={false}
-                showCancelButton={false}
+                onCancel={() => handleCancel(reservation.id)}
+                isCancelling={cancellingId === reservation.id}
+                showCancelButton={reservation.user_id === userId}
                 badgeFor={badgeFor}
                 formatDate={(d: string) => new Date(d).toLocaleDateString("es-ES", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
                 formatTime={(t: string) => t.slice(0, 5)}
@@ -164,6 +182,8 @@ export function UserReservations({ reservations: initialReservations }: UserRese
           </div>
         </section>
       )}
+
+      <AlertModal open={modalOpen} onClose={() => setModalOpen(false)} title="Reserva" message={modalMsg} />
     </div>
   )
 }
@@ -209,7 +229,14 @@ function ReservationCard({
               <CardDescription className="text-slate-600">{formatDate(reservation.date)}</CardDescription>
             </div>
           </div>
-          {badgeFor(reservation)}
+          <div className="flex items-center gap-4">
+            {badgeFor(reservation)}
+            {showCancelButton && (
+              <Button size="sm" variant="destructive" onClick={() => onCancel(reservation.id)} disabled={isCancelling}>
+                {isCancelling ? "Cancelando..." : "Cancelar"}
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
 
@@ -220,7 +247,7 @@ function ReservationCard({
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>{formatTime(reservation.start_time)} – {formatTime(reservation.end_time)}</span>
+              <span>{formatTime(reservation.start_time)} - {formatTime(reservation.end_time)}</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
