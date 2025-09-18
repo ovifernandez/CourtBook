@@ -1,30 +1,65 @@
-# Reservas de tenis
+CourtBook 🎾🏓
+Welcome to CourtBook – your go-to web app for seamless tennis 🎾 and paddle 🏓 court reservations! Experience hassle-free booking with real-time availability, user authentication, and intuitive calendar management.
 
-*Automatically synced with your [v0.app](https://v0.app) deployments*
+🚀 Features
+Responsive design for desktop & mobile 📱💻
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/ovifernandezs-projects/v0-reservas-de-tenis)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app/chat/projects/ScrFOg34Q4I)
+Real-time court availability updates ⚡
 
-## Overview
+User signup/login with secure authentication 🔐
 
-This repository will stay in sync with your deployed chats on [v0.app](https://v0.app).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.app](https://v0.app).
+Book courts by date and time, with conflict prevention ⏰❌
 
-## Deployment
+View upcoming and past reservations easily 📅
 
-Your project is live at:
+Dynamic slots selection with booking confirmation ✅
 
-**[https://vercel.com/ovifernandezs-projects/v0-reservas-de-tenis](https://vercel.com/ovifernandezs-projects/v0-reservas-de-tenis)**
+🌐 Live Demo
+Check out the live version of CourtBook here:
+https://v0-reservas-de-tenis-git-develop-ovifernandezs-projects.vercel.app/
 
-## Build your app
+Try booking tennis or paddle courts effortlessly!
 
-Continue building your app on:
+🛠️ Built With
+Next.js (React framework) ⚛️
 
-**[https://v0.app/chat/projects/ScrFOg34Q4I](https://v0.app/chat/projects/ScrFOg34Q4I)**
+Supabase (Authentication & Database) ☁️
 
-## How It Works
+PostgreSQL (Relational database) 🐘
 
-1. Create and modify your project using [v0.app](https://v0.app)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+Tailwind CSS (Modern styling) 🎨
+
+Realtime data syncing with Supabase Realtime 🔄
+
+TypeScript for type safety 🦸
+
+Vercel for deployment 🚀
+
+📥 Getting Started
+Prerequisites
+Node.js installed
+
+PNPM package manager (recommended)
+
+Installation
+bash
+git clone https://github.com/ovifernandez/CourtBook.git
+cd CourtBook
+pnpm install
+pnpm run dev
+Usage
+Open http://localhost:3000
+
+Register or login
+
+Select your preferred court and date
+
+Choose available time slots and confirm your booking!
+
+🤝 Contributing
+Feel free to open issues or submit pull requests to make CourtBook even better!
+
+📄 License
+MIT License © 2025 CourtBook Team
+
+Enjoy booking your game time effortlessly with CourtBook! 🎉🏆
