@@ -9,7 +9,6 @@ import type { Reservation } from "@/lib/types"
 import Link from "next/link"
 import { AlertModal } from "@/components/ui/alert-modal"
 
-// Se añade userId a las reservas para distinguir propias
 interface ReservationWithUser extends Reservation {
   court: any
   user_id: string
@@ -24,20 +23,18 @@ export function UserReservations({ reservations: initialReservations }: UserRese
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
-  const [now, setNow] = useState<Date>(() => new Date()) // "reloj" interno
+  const [now, setNow] = useState<Date>(() => new Date())
   const [modalOpen, setModalOpen] = useState(false)
   const [modalMsg, setModalMsg] = useState("")
 
   const supabase = createClient()
 
   useEffect(() => {
-    const msUntilMidnight =
-      new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime()
+    const msUntilMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime()
     const timer = setTimeout(() => setNow(new Date()), msUntilMidnight)
     return () => clearTimeout(timer)
   }, [now])
 
-  // Obtener usuario activo
   useEffect(() => {
     const fetchUser = async () => {
       const {
@@ -53,14 +50,13 @@ export function UserReservations({ reservations: initialReservations }: UserRese
     fetchUser()
   }, [supabase])
 
-  // Refrescar todas las reservas activas (no solo las propias)
   const refreshReservations = async () => {
     setIsLoading(true)
     try {
       const { data } = await supabase
         .from("reservations")
         .select(`*, court:courts(*)`)
-        .eq("status", "active") // solo activas
+        .eq("status", "active")
         .order("date", { ascending: true })
         .order("start_time", { ascending: true })
 
@@ -72,7 +68,6 @@ export function UserReservations({ reservations: initialReservations }: UserRese
     }
   }
 
-  // Suscripción realtime sin filtro por userId (recibe todos los cambios)
   useEffect(() => {
     refreshReservations()
     const channel = supabase
@@ -80,7 +75,7 @@ export function UserReservations({ reservations: initialReservations }: UserRese
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "reservations", filter: `status=eq.active` },
-        () => refreshReservations(),
+        () => refreshReservations()
       )
       .subscribe()
 
@@ -90,19 +85,16 @@ export function UserReservations({ reservations: initialReservations }: UserRese
   const sevenDaysAhead = new Date(now)
   sevenDaysAhead.setDate(now.getDate() + 7)
 
-  // Próximas reservas activas dentro de 7 días
   const upcomingReservations = reservations.filter((r) => {
     const date = new Date(`${r.date}T${r.start_time}`)
     return date >= now && date <= sevenDaysAhead && r.status === "active"
   })
 
-  // Historial (canceladas o pasadas)
   const pastReservations = reservations.filter((r) => {
     const date = new Date(`${r.date}T${r.start_time}`)
     return date < now || r.status === "cancelled"
   })
 
-  // Mostrar badge y diferenciar reservas propias
   const badgeFor = (reservation: ReservationWithUser) => {
     const date = new Date(`${reservation.date}T${reservation.start_time}`)
     if (reservation.status === "cancelled") return <Badge variant="destructive">Cancelada</Badge>
@@ -110,8 +102,6 @@ export function UserReservations({ reservations: initialReservations }: UserRese
     if (reservation.user_id === userId) return <Badge className="bg-emerald-100 text-emerald-700">Tuya</Badge>
     return <Badge className="bg-slate-300 text-slate-600">Ocupada</Badge>
   }
-
-  // El resto del render y handler de cancelación, botones, etc se mantiene igual...
 
   return (
     <div className="space-y-8">
@@ -204,9 +194,7 @@ function ReservationCard({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div
-              className={`w-10 h-10 rounded-lg flex items-center justify-center ${isTennis ? "bg-blue-100" : "bg-orange-100"}`}
-            >
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isTennis ? "bg-blue-100" : "bg-orange-100"}`}>
               <svg
                 className={`w-5 h-5 ${isTennis ? "text-blue-600" : "text-orange-600"}`}
                 fill="none"
@@ -236,4 +224,13 @@ function ReservationCard({
             </div>
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span>#{reservation.id.slice(-8)}</span>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
