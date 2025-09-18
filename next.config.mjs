@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // ... tus otras configuraciones aquí
+  reactStrictMode: true, // Ayuda a detectar problemas en desarrollo
+  swcMinify: true, // Usa el compilador SWC para minificación rápida
 
   async headers() {
     return [
@@ -12,7 +13,7 @@ const nextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "same-origin" },
           { key: "Permissions-Policy", value: "geolocation=(), microphone=()" },
-          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self' 'unsafe-eval'; img-src 'self' data:;" }
+          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self' 'unsafe-eval'; img-src 'self' data:;" },
         ],
       },
     ]
