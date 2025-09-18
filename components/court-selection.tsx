@@ -124,7 +124,7 @@ function CourtCard({ court, onSelect }: CourtCardProps) {
                 d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <span>Horarios: 9:00 - 23:30</span>
+            <span>Horarios: 8:30 - 23:30</span>
           </div>
           <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white group-hover:bg-emerald-700">
             Ver Horarios
