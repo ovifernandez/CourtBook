@@ -2,9 +2,11 @@
 @import "tw-animate-css";
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Updated font variables to match new Google Fonts */
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
 
+  /* Improved color system with better contrast */
   --color-background: oklch(1 0 0);
   --color-foreground: oklch(0.145 0 0);
   --color-card: oklch(1 0 0);
@@ -44,6 +46,7 @@
 }
 
 .dark {
+  /* Enhanced dark mode colors with better contrast */
   --color-background: oklch(0.145 0 0);
   --color-foreground: oklch(0.985 0 0);
   --color-card: oklch(0.145 0 0);
@@ -87,17 +90,30 @@
     @apply bg-background text-foreground;
   }
 
-  /* Improved focus indicators for accessibility */
+  /* Enhanced accessibility with better focus indicators */
   *:focus-visible {
     @apply outline-2 outline-offset-2 outline-ring;
   }
 
-  /* Better contrast for links */
+  /* Better contrast for links and interactive elements */
   a {
     @apply text-foreground hover:text-primary focus:text-primary;
   }
 
-  /* Ensure sufficient contrast for emerald colors */
+  /* Screen reader only text for better accessibility */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* Ensure sufficient contrast for green colors replacing emerald */
   .bg-emerald-50 {
     @apply bg-green-50;
   }
@@ -120,5 +136,13 @@
 
   .bg-emerald-600 {
     @apply bg-green-700;
+  }
+
+  .border-emerald-200 {
+    @apply border-green-200;
+  }
+
+  .hover\:text-emerald-700:hover {
+    @apply hover:text-green-800;
   }
 }

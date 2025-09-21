@@ -1,9 +1,21 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { GeistSans, GeistMono } from "geist/font"
+import { Inter, JetBrains_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { Suspense } from "react"
 import "./globals.css"
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+})
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+})
 
 export const metadata: Metadata = {
   title: "CourtBook Boadilla - Reservas de Tenis",
@@ -17,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="es" className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}>
+    <html lang="es" className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}>
       <body className="font-sans min-h-screen bg-background text-foreground">
         <Suspense fallback={<div>Loading...</div>}>
           <main role="main">{children}</main>
