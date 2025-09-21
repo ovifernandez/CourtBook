@@ -18,8 +18,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}>
-      <body className="font-sans">
-        <Suspense fallback={null}>{children}</Suspense>
+      <body className="font-sans min-h-screen bg-background text-foreground">
+        <Suspense fallback={<div>Loading...</div>}>
+          <main role="main">{children}</main>
+        </Suspense>
         <Analytics />
       </body>
     </html>

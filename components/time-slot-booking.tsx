@@ -46,14 +46,27 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
 
   const loadReservations = async () => {
     const supabase = createClient()
-    const { data } = await supabase
-      .from("reservations")
-      .select("*")
-      .eq("court_id", court.id)
-      .eq("date", selectedDate)
-      .eq("status", "active")
+    try {
+      const { data, error } = await supabase
+        .from("reservations")
+        .select("*")
+        .eq("court_id", court.id)
+        .eq("date", selectedDate)
+        .eq("status", "active")
 
-    setReservations(data || [])
+      if (error) {
+        console.error("[v0] Error loading reservations:", error)
+        setModalMsg("Error al cargar las reservas. Por favor, recarga la página.")
+        setModalOpen(true)
+        return
+      }
+
+      setReservations(data || [])
+    } catch (error) {
+      console.error("[v0] Unexpected error loading reservations:", error)
+      setModalMsg("Error inesperado. Por favor, recarga la página.")
+      setModalOpen(true)
+    }
   }
 
   useEffect(() => {
@@ -72,7 +85,7 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
           table: "reservations",
           filter: `court_id=eq.${court.id},date=eq.${selectedDate}`,
         },
-        () => loadReservations()
+        () => loadReservations(),
       )
       .subscribe()
 
@@ -132,15 +145,27 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
     try {
       const {
         data: { user },
+        error: authError,
       } = await supabase.auth.getUser()
-      if (!user) throw new Error("Usuario no autenticado")
 
-      const { data: currentReservations } = await supabase
+      if (authError || !user) {
+        throw new Error("Sesión expirada. Por favor, inicia sesión nuevamente.")
+      }
+
+      if (!selectedDate || selectedSlots.length === 0) {
+        throw new Error("Datos de reserva inválidos.")
+      }
+
+      const { data: currentReservations, error: fetchError } = await supabase
         .from("reservations")
         .select("*")
         .eq("court_id", court.id)
         .eq("date", selectedDate)
         .eq("status", "active")
+
+      if (fetchError) {
+        throw new Error("Error al verificar disponibilidad. Inténtalo de nuevo.")
+      }
 
       const selectedMinutes = selectedSlots.map((slot) => timeToMinutes(slot)).sort((a, b) => a - b)
 
@@ -161,14 +186,24 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
         .eq("id", user.id)
         .single()
 
-      if (profileError || !profile) {
-        const { error: createProfileError } = await supabase.from("profiles").insert({
+      if (profileError && profileError.code !== "PGRST116") {
+        throw new Error("Error al verificar perfil de usuario.")
+      }
+
+      if (!profile) {
+        const profileData = {
           id: user.id,
           email: user.email || "",
           street: "",
-          full_name: user.user_metadata?.full_name || "",
-        })
-        if (createProfileError) throw new Error("Error al crear perfil de usuario")
+          full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "",
+        }
+
+        const { error: createProfileError } = await supabase.from("profiles").insert(profileData)
+
+        if (createProfileError) {
+          console.error("[v0] Profile creation error:", createProfileError)
+          throw new Error("Error al crear perfil de usuario. Contacta al administrador.")
+        }
       }
 
       const sortedSlots = selectedSlots.sort()
@@ -176,20 +211,32 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
       const endSlotIndex = timeSlots.findIndex((slot) => slot.time === sortedSlots[sortedSlots.length - 1])
       const endTime = timeSlots[endSlotIndex + 1]?.time || "23:30"
 
-      const { data: newReservation, error } = await supabase
+      if (!startTime || !endTime) {
+        throw new Error("Error en la selección de horarios.")
+      }
+
+      const reservationData = {
+        user_id: user.id,
+        court_id: court.id,
+        date: selectedDate,
+        start_time: startTime,
+        end_time: endTime,
+        status: "active" as const,
+      }
+
+      const { data: newReservation, error: insertError } = await supabase
         .from("reservations")
-        .insert({
-          user_id: user.id,
-          court_id: court.id,
-          date: selectedDate,
-          start_time: startTime,
-          end_time: endTime,
-          status: "active",
-        })
+        .insert(reservationData)
         .select()
         .single()
 
-      if (error) throw error
+      if (insertError) {
+        console.error("[v0] Reservation creation error:", insertError)
+        if (insertError.code === "23505") {
+          throw new Error("Ya existe una reserva en conflicto. Por favor, elige otros horarios.")
+        }
+        throw new Error("Error al crear la reserva. Por favor, inténtalo de nuevo.")
+      }
 
       if (newReservation) {
         setReservations((prev) => [...prev, newReservation])
@@ -199,6 +246,7 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
       setModalMsg("¡Reserva confirmada exitosamente!")
       setModalOpen(true)
     } catch (error: any) {
+      console.error("[v0] Booking error:", error)
       setModalMsg(error.message || "Error al crear la reserva. Por favor, inténtalo de nuevo.")
       setModalOpen(true)
     } finally {
@@ -233,12 +281,15 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
               className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                 court.type === "tennis" ? "bg-blue-100" : "bg-orange-100"
               }`}
+              role="img"
+              aria-label={`Icono de ${court.type === "tennis" ? "tenis" : "pádel"}`}
             >
               <svg
                 className={`w-5 h-5 ${court.type === "tennis" ? "text-blue-600" : "text-orange-600"}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
@@ -256,7 +307,7 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
           <CardTitle className="text-lg">Seleccionar Fecha</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-2 overflow-x-auto pb-2">
+          <div className="flex gap-2 overflow-x-auto pb-2" role="tablist" aria-label="Seleccionar fecha">
             {getNextDays(7).map((date) => {
               const dateString = date.toISOString().split("T")[0]
               const isSelected = selectedDate === dateString
@@ -269,8 +320,11 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
                   size="sm"
                   onClick={() => setSelectedDate(dateString)}
                   className={`min-w-fit ${
-                    isSelected ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "border-slate-200 hover:bg-slate-50"
+                    isSelected ? "bg-green-700 hover:bg-green-800 text-white" : "border-slate-200 hover:bg-slate-50"
                   }`}
+                  role="tab"
+                  aria-selected={isSelected}
+                  aria-label={`Seleccionar fecha ${formatDate(date)}`}
                 >
                   <div className="text-center">
                     <div className="text-xs">{formatDate(date)}</div>
@@ -289,7 +343,11 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
           <p className="text-sm text-slate-600">Puedes reservar hasta 2 slots consecutivos (3 horas máximo)</p>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          <div
+            className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3"
+            role="grid"
+            aria-label="Horarios disponibles"
+          >
             {timeSlots.map((slot) => {
               const isSelected = selectedSlots.includes(slot.time)
               const isAvailable = slot.available
@@ -304,11 +362,14 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
                   disabled={!isAvailable || isPast}
                   className={`h-12 ${
                     isSelected
-                      ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                      ? "bg-green-700 hover:bg-green-800 text-white"
                       : isAvailable && !isPast
-                      ? "border-emerald-200 hover:bg-emerald-50 text-slate-700"
-                      : "bg-red-100 text-red-600 cursor-not-allowed hover:bg-red-100"
+                        ? "border-green-200 hover:bg-green-50 text-slate-700"
+                        : "bg-red-100 text-red-600 cursor-not-allowed hover:bg-red-100"
                   }`}
+                  role="gridcell"
+                  aria-selected={isSelected}
+                  aria-label={`Horario ${slot.time}, ${isPast ? "pasado" : isAvailable ? "disponible" : "ocupado"}`}
                 >
                   <div className="text-center">
                     <div className="font-medium">{slot.time}</div>
@@ -320,7 +381,7 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
           </div>
 
           {selectedSlots.length > 0 && (
-            <div className="mt-6 p-4 bg-emerald-50 rounded-lg">
+            <div className="mt-6 p-4 bg-green-50 rounded-lg" role="region" aria-label="Resumen de reserva">
               <div className="hidden sm:flex items-center justify-between">
                 <div>
                   <h4 className="font-medium text-slate-800">Reserva Seleccionada</h4>
@@ -331,7 +392,8 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
                 <Button
                   onClick={handleBooking}
                   disabled={isLoading}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  className="bg-green-700 hover:bg-green-800 text-white"
+                  aria-describedby="booking-summary"
                 >
                   {isLoading ? "Reservando..." : "Confirmar Reserva"}
                 </Button>
@@ -340,14 +402,15 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
               <div className="sm:hidden space-y-4">
                 <div className="text-center">
                   <h4 className="font-medium text-slate-800">Reserva Seleccionada</h4>
-                  <p className="text-sm text-slate-600">
+                  <p className="text-sm text-slate-600" id="booking-summary">
                     {selectedSlots.sort().join(" - ")} ({selectedSlots.length * 1.5} horas)
                   </p>
                 </div>
                 <Button
                   onClick={handleBooking}
                   disabled={isLoading}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                  className="w-full bg-green-700 hover:bg-green-800 text-white"
+                  aria-describedby="booking-summary"
                 >
                   {isLoading ? "Reservando..." : "Confirmar Reserva"}
                 </Button>
@@ -357,7 +420,13 @@ export function TimeSlotBooking({ court }: TimeSlotBookingProps) {
         </CardContent>
       </Card>
 
-      <AlertModal open={modalOpen} onClose={() => setModalOpen(false)} title="Reserva" message={modalMsg} />
+      <AlertModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title="Reserva"
+        message={modalMsg}
+        aria-live="polite"
+      />
     </div>
   )
 }

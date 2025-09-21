@@ -1,13 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
 import type { Reservation } from "@/lib/types"
 import Link from "next/link"
 import { AlertModal } from "@/components/ui/alert-modal"
+import { ReservationCard } from "./reservation-card"
 
 interface ReservationWithUser extends Reservation {
   court: any
@@ -53,16 +54,25 @@ export function UserReservations({ reservations: initialReservations }: UserRese
   const refreshReservations = async () => {
     setIsLoading(true)
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("reservations")
         .select(`*, court:courts(*)`)
         .eq("status", "active")
         .order("date", { ascending: true })
         .order("start_time", { ascending: true })
 
+      if (error) {
+        console.error("[v0] Error refreshing reservations:", error)
+        setModalMsg("Error al cargar las reservas. Por favor, recarga la página.")
+        setModalOpen(true)
+        return
+      }
+
       if (data) setReservations(data)
     } catch (error) {
-      console.error("Error refreshing reservations:", error)
+      console.error("[v0] Unexpected error refreshing reservations:", error)
+      setModalMsg("Error inesperado. Por favor, recarga la página.")
+      setModalOpen(true)
     } finally {
       setIsLoading(false)
     }
@@ -72,10 +82,8 @@ export function UserReservations({ reservations: initialReservations }: UserRese
     refreshReservations()
     const channel = supabase
       .channel("all-reservations")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "reservations", filter: `status=eq.active` },
-        () => refreshReservations()
+      .on("postgres_changes", { event: "*", schema: "public", table: "reservations", filter: `status=eq.active` }, () =>
+        refreshReservations(),
       )
       .subscribe()
 
@@ -83,16 +91,50 @@ export function UserReservations({ reservations: initialReservations }: UserRese
   }, [supabase])
 
   const handleCancel = async (id: string) => {
+    if (!id || typeof id !== "string") {
+      setModalMsg("ID de reserva inválido.")
+      setModalOpen(true)
+      return
+    }
+
     setCancellingId(id)
     setIsLoading(true)
     try {
-      const { error } = await supabase.from("reservations").update({ status: "cancelled" }).eq("id", id)
-      if (error) throw error
-      setModalMsg("Reservation cancelled successfully")
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser()
+
+      if (authError || !user) {
+        throw new Error("Sesión expirada. Por favor, inicia sesión nuevamente.")
+      }
+
+      const reservation = reservations.find((r) => r.id === id)
+      if (!reservation) {
+        throw new Error("Reserva no encontrada.")
+      }
+
+      if (reservation.user_id !== user.id) {
+        throw new Error("No tienes permisos para cancelar esta reserva.")
+      }
+
+      const { error } = await supabase
+        .from("reservations")
+        .update({ status: "cancelled" })
+        .eq("id", id)
+        .eq("user_id", user.id)
+
+      if (error) {
+        console.error("[v0] Cancellation error:", error)
+        throw new Error("Error al cancelar la reserva. Inténtalo de nuevo.")
+      }
+
+      setModalMsg("Reserva cancelada exitosamente")
       setModalOpen(true)
       refreshReservations()
     } catch (error: any) {
-      setModalMsg(error.message || "Error cancelling reservation")
+      console.error("[v0] Cancellation error:", error)
+      setModalMsg(error.message || "Error al cancelar la reserva")
       setModalOpen(true)
     } finally {
       setIsLoading(false)
@@ -127,26 +169,32 @@ export function UserReservations({ reservations: initialReservations }: UserRese
         <div>
           <h1 className="text-3xl font-bold text-slate-800">Reservas</h1>
           <p className="text-slate-600">Todas las reservas para evitar solapamientos</p>
-          {isLoading && <p className="text-sm text-emerald-600">Actualizando…</p>}
+          {isLoading && (
+            <p className="text-sm text-green-600" aria-live="polite">
+              Actualizando…
+            </p>
+          )}
         </div>
-        <Button asChild className="w-full max-w-xs sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white">
+        <Button asChild className="w-full max-w-xs sm:w-auto bg-green-700 hover:bg-green-800 text-white">
           <Link href="/dashboard">Nueva Reserva</Link>
         </Button>
       </div>
 
-      <section>
-        <h2 className="text-2xl font-bold text-slate-800 mb-6">Próximas Reservas</h2>
+      <section aria-labelledby="upcoming-reservations">
+        <h2 id="upcoming-reservations" className="text-2xl font-bold text-slate-800 mb-6">
+          Próximas Reservas
+        </h2>
         {upcomingReservations.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <p className="text-slate-600">No hay reservas próximas.</p>
-              <Button asChild className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white">
+              <Button asChild className="mt-4 bg-green-700 hover:bg-green-800 text-white">
                 <Link href="/dashboard">Hacer Reserva</Link>
               </Button>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4">
+          <div className="grid gap-4" role="list">
             {upcomingReservations.map((reservation) => (
               <ReservationCard
                 key={reservation.id}
@@ -155,7 +203,14 @@ export function UserReservations({ reservations: initialReservations }: UserRese
                 isCancelling={cancellingId === reservation.id}
                 showCancelButton={reservation.user_id === userId}
                 badgeFor={badgeFor}
-                formatDate={(d: string) => new Date(d).toLocaleDateString("es-ES", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+                formatDate={(d: string) =>
+                  new Date(d).toLocaleDateString("es-ES", {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })
+                }
                 formatTime={(t: string) => t.slice(0, 5)}
               />
             ))}
@@ -164,9 +219,11 @@ export function UserReservations({ reservations: initialReservations }: UserRese
       </section>
 
       {pastReservations.length > 0 && (
-        <section>
-          <h2 className="text-2xl font-bold text-slate-800 mb-6">Historial</h2>
-          <div className="grid gap-4">
+        <section aria-labelledby="past-reservations">
+          <h2 id="past-reservations" className="text-2xl font-bold text-slate-800 mb-6">
+            Historial
+          </h2>
+          <div className="grid gap-4" role="list">
             {pastReservations.map((reservation) => (
               <ReservationCard
                 key={reservation.id}
@@ -175,7 +232,14 @@ export function UserReservations({ reservations: initialReservations }: UserRese
                 isCancelling={cancellingId === reservation.id}
                 showCancelButton={reservation.user_id === userId}
                 badgeFor={badgeFor}
-                formatDate={(d: string) => new Date(d).toLocaleDateString("es-ES", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+                formatDate={(d: string) =>
+                  new Date(d).toLocaleDateString("es-ES", {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })
+                }
                 formatTime={(t: string) => t.slice(0, 5)}
               />
             ))}
@@ -183,81 +247,13 @@ export function UserReservations({ reservations: initialReservations }: UserRese
         </section>
       )}
 
-      <AlertModal open={modalOpen} onClose={() => setModalOpen(false)} title="Reserva" message={modalMsg} />
+      <AlertModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title="Reserva"
+        message={modalMsg}
+        aria-live="polite"
+      />
     </div>
-  )
-}
-
-interface ReservationCardProps {
-  reservation: ReservationWithUser
-  onCancel: (id: string) => void
-  isCancelling: boolean
-  showCancelButton: boolean
-  badgeFor: (r: ReservationWithUser) => JSX.Element
-  formatDate: (d: string) => string
-  formatTime: (t: string) => string
-}
-
-function ReservationCard({
-  reservation,
-  onCancel,
-  isCancelling,
-  showCancelButton,
-  badgeFor,
-  formatDate,
-  formatTime,
-}: ReservationCardProps) {
-  const isTennis = reservation.court?.type === "tennis"
-
-  return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isTennis ? "bg-blue-100" : "bg-orange-100"}`}>
-              <svg
-                className={`w-5 h-5 ${isTennis ? "text-blue-600" : "text-orange-600"}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <CardTitle className="text-lg font-semibold text-slate-800">{reservation.court?.name}</CardTitle>
-              <CardDescription className="text-slate-600">{formatDate(reservation.date)}</CardDescription>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            {badgeFor(reservation)}
-            {showCancelButton && (
-              <Button size="sm" variant="destructive" onClick={() => onCancel(reservation.id)} disabled={isCancelling}>
-                {isCancelling ? "Cancelando..." : "Cancelar"}
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 text-sm text-slate-600">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>{formatTime(reservation.start_time)} - {formatTime(reservation.end_time)}</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-slate-600">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <span>#{reservation.id.slice(-8)}</span>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   )
 }

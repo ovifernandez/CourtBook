@@ -27,17 +27,25 @@ export async function updateSession(request: NextRequest) {
 
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser()
+
+  if (userError) {
+    console.log("[v0] Auth error in middleware:", userError.message)
+  }
 
   if (!user && request.nextUrl.pathname.startsWith("/dashboard")) {
     const url = request.nextUrl.clone()
     url.pathname = "/auth/login"
+    url.searchParams.set("redirectTo", request.nextUrl.pathname)
     return NextResponse.redirect(url)
   }
 
   if (user && request.nextUrl.pathname.startsWith("/auth")) {
     const url = request.nextUrl.clone()
-    url.pathname = "/dashboard"
+    const redirectTo = request.nextUrl.searchParams.get("redirectTo")
+    url.pathname = redirectTo && redirectTo.startsWith("/dashboard") ? redirectTo : "/dashboard"
+    url.searchParams.delete("redirectTo")
     return NextResponse.redirect(url)
   }
 
@@ -46,6 +54,10 @@ export async function updateSession(request: NextRequest) {
     url.pathname = user ? "/dashboard" : "/auth/login"
     return NextResponse.redirect(url)
   }
+
+  supabaseResponse.headers.set("X-Frame-Options", "DENY")
+  supabaseResponse.headers.set("X-Content-Type-Options", "nosniff")
+  supabaseResponse.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
 
   return supabaseResponse
 }
