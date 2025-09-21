@@ -38,7 +38,7 @@ export function CourtSelection({ courts }: CourtSelectionProps) {
         <div className="flex items-center gap-4 mb-8">
           <div className="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center shadow-xl relative">
             <svg className="w-8 h-8 text-primary-foreground" fill="currentColor" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10" fill="currentColor" />
+              <span className="text-2xl">🎾</span>
               <path
                 d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
                 fill="none"
@@ -52,7 +52,6 @@ export function CourtSelection({ courts }: CourtSelectionProps) {
           <div>
             <h2 className="text-3xl font-bold text-foreground flex items-center gap-2">
               Pistas de Tenis
-              <span className="text-2xl">🎾</span>
             </h2>
             <p className="text-muted-foreground text-lg">Juega en nuestras pistas de tenis profesionales</p>
           </div>
