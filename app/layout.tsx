@@ -1,22 +1,14 @@
-import type { Metadata } from 'next'
-import { GeistSans } from 'geist/font/sans'
-import { Analytics } from '@vercel/analytics/next'
-import { Suspense } from 'react'
-import './globals.css'
+import type React from "react"
+import type { Metadata } from "next"
+import { GeistSans, GeistMono } from "geist/font"
+import { Analytics } from "@vercel/analytics/next"
+import { Suspense } from "react"
+import "./globals.css"
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.app',
-}
-
-// Componente wrapper cliente con Suspense
-function ClientWrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Cargando...</div>}>
-      {children}
-    </Suspense>
-  )
+  title: "CourtBook Boadilla - Reservas de Tenis",
+  description: "Sistema de reservas de pistas de tenis para vecinos de Boadilla",
+  generator: "v0.app",
 }
 
 export default function RootLayout({
@@ -25,11 +17,9 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className={`font-sans ${GeistSans.variable} font-mono`}>
-        <ClientWrapper>
-          {children}
-        </ClientWrapper>
+    <html lang="es" className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}>
+      <body className="font-sans">
+        <Suspense fallback={null}>{children}</Suspense>
         <Analytics />
       </body>
     </html>
