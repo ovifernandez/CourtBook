@@ -45,7 +45,7 @@ export function CourtSelection({ courts }: CourtSelectionProps) {
                 stroke="white"
                 strokeWidth="1"
               />
-              <path d="M2 12h20" fill="none" stroke="white" strokeWidth="1" />
+              
             </svg>
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-accent rounded-full animate-pulse"></div>
           </div>
