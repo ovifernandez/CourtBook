@@ -30,10 +30,11 @@ export async function updateSession(request: NextRequest) {
     error: userError,
   } = await supabase.auth.getUser()
 
-  if (userError) {
+  if (userError && userError.message !== "Auth session missing!") {
     console.log("[v0] Auth error in middleware:", userError.message)
   }
 
+  // Redirect unauthenticated users trying to access dashboard
   if (!user && request.nextUrl.pathname.startsWith("/dashboard")) {
     const url = request.nextUrl.clone()
     url.pathname = "/auth/login"
@@ -41,6 +42,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  // Redirect authenticated users away from auth pages
   if (user && request.nextUrl.pathname.startsWith("/auth")) {
     const url = request.nextUrl.clone()
     const redirectTo = request.nextUrl.searchParams.get("redirectTo")
@@ -49,6 +51,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  // Redirect root path based on auth status
   if (request.nextUrl.pathname === "/") {
     const url = request.nextUrl.clone()
     url.pathname = user ? "/dashboard" : "/auth/login"
@@ -58,6 +61,8 @@ export async function updateSession(request: NextRequest) {
   supabaseResponse.headers.set("X-Frame-Options", "DENY")
   supabaseResponse.headers.set("X-Content-Type-Options", "nosniff")
   supabaseResponse.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
+  supabaseResponse.headers.set("X-XSS-Protection", "1; mode=block")
+  supabaseResponse.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 
   return supabaseResponse
 }
