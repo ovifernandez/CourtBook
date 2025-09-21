@@ -20,7 +20,7 @@ export function CourtSelection({ courts }: CourtSelectionProps) {
         <Button
           variant="outline"
           onClick={() => setSelectedCourt(null)}
-          className="mb-6 border-emerald-600 text-emerald-600 hover:bg-emerald-50"
+          className="mb-6 border-primary text-primary hover:bg-primary/10"
         >
           ← Volver a selección de pistas
         </Button>
@@ -33,53 +33,62 @@ export function CourtSelection({ courts }: CourtSelectionProps) {
   const padelCourts = courts.filter((court) => court.type === "padel")
 
   return (
-    <div className="space-y-8">
-      {/* Tennis Courts Section */}
+    <div className="space-y-12">
       <div>
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-            <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="flex items-center gap-4 mb-8">
+          <div className="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center shadow-xl relative">
+            <svg className="w-8 h-8 text-primary-foreground" fill="currentColor" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" fill="currentColor" />
               <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
+                d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+                fill="none"
+                stroke="white"
+                strokeWidth="1"
               />
+              <path d="M2 12h20" fill="none" stroke="white" strokeWidth="1" />
             </svg>
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-accent rounded-full animate-pulse"></div>
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Pistas de Tenis</h2>
-            <p className="text-slate-600">Reserva tu pista de tenis favorita</p>
+            <h2 className="text-3xl font-bold text-foreground flex items-center gap-2">
+              Pistas de Tenis
+              <span className="text-2xl">🎾</span>
+            </h2>
+            <p className="text-muted-foreground text-lg">Juega en nuestras pistas de tenis profesionales</p>
           </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-8">
           {tennisCourts.map((court) => (
             <CourtCard key={court.id} court={court} onSelect={setSelectedCourt} />
           ))}
         </div>
       </div>
 
-      {/* Padel Courts Section */}
       <div>
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-            <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
-              />
+        <div className="flex items-center gap-4 mb-8">
+          <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-orange-400 rounded-full flex items-center justify-center shadow-xl relative">
+            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <circle cx="9" cy="9" r="2" />
+              <path d="m21 15-3.086-3.086a2 2 0 0 0-1.414-.586H13" />
+              <path d="M7 7h.01" />
+              <path d="M17 7h.01" />
+              <path d="M7 17h.01" />
+              <path d="M17 17h.01" />
             </svg>
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-orange-300 rounded-full animate-pulse"></div>
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Pistas de Pádel</h2>
-            <p className="text-slate-600">Disfruta del pádel en nuestra pista</p>
+            <h2 className="text-3xl font-bold text-foreground flex items-center gap-2">
+              Pistas de Pádel
+              <span className="text-2xl">🏓</span>
+            </h2>
+            <p className="text-muted-foreground text-lg">Disfruta del pádel en nuestra pista con cristales</p>
           </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-8">
           {padelCourts.map((court) => (
             <CourtCard key={court.id} court={court} onSelect={setSelectedCourt} />
           ))}
@@ -98,36 +107,63 @@ function CourtCard({ court, onSelect }: CourtCardProps) {
   const isTennis = court.type === "tennis"
 
   return (
-    <Card className="hover:shadow-lg transition-shadow cursor-pointer group" onClick={() => onSelect(court)}>
-      <CardHeader className="pb-3">
+    <Card className="hover:shadow-2xl transition-all duration-300 cursor-pointer group hover:scale-105 border-2 hover:border-primary/30 bg-card relative overflow-hidden">
+      <div className="absolute inset-0 court-pattern opacity-5"></div>
+      <div className="absolute top-4 right-4">
+        {isTennis ? (
+          <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
+            <span className="text-lg">🎾</span>
+          </div>
+        ) : (
+          <div className="w-8 h-8 bg-orange-500/20 rounded-full flex items-center justify-center">
+            <span className="text-lg">🏓</span>
+          </div>
+        )}
+      </div>
+
+      <CardHeader className="pb-4 relative z-10" onClick={() => onSelect(court)}>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-slate-800">{court.name}</CardTitle>
+          <CardTitle className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">
+            {court.name}
+          </CardTitle>
           <Badge
             variant={isTennis ? "default" : "secondary"}
-            className={isTennis ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"}
+            className={
+              isTennis
+                ? "bg-primary/20 text-primary border-primary/30 font-semibold"
+                : "bg-orange-500/20 text-orange-700 border-orange-500/30 font-semibold"
+            }
           >
             {isTennis ? "Tenis" : "Pádel"}
           </Badge>
         </div>
-        <CardDescription className="text-slate-600">
-          {isTennis ? "Pista de tenis reglamentaria" : "Pista de pádel con cristales"}
+        <CardDescription className="text-muted-foreground text-base">
+          {isTennis
+            ? "Pista de tenis reglamentaria con superficie dura"
+            : "Pista de pádel cerrada con cristales y césped artificial"}
         </CardDescription>
       </CardHeader>
-      <CardContent>
+
+      <CardContent className="relative z-10" onClick={() => onSelect(court)}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-slate-600">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <span>Horarios: 8:30 - 23:30</span>
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span className="font-medium">8:30 - 23:30</span>
+            </div>
           </div>
-          <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white group-hover:bg-emerald-700">
-            Ver Horarios
+          <Button
+            size="sm"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground group-hover:shadow-lg transition-all font-semibold"
+          >
+            Ver Horarios →
           </Button>
         </div>
       </CardContent>

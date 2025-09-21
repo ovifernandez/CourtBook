@@ -28,21 +28,32 @@ export function Navigation() {
   const closeMobileMenu = () => setIsMobileMenuOpen(false)
 
   return (
-    <nav className="bg-white shadow-sm border-b border-slate-200">
+    <nav className="bg-card shadow-lg border-b-2 border-primary/20 backdrop-blur-sm">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2" onClick={closeMobileMenu}>
-            <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          <Link href="/dashboard" className="flex items-center gap-3 group" onClick={closeMobileMenu}>
+            <div className="w-10 h-10 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all group-hover:scale-110">
+              <svg className="w-5 h-5 text-primary-foreground" fill="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" />
+                <path
+                  d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="1"
+                />
+                <path d="M2 12h20" fill="none" stroke="white" strokeWidth="1" />
               </svg>
             </div>
-            <span className="font-bold text-slate-800">CourtBook</span>
+            <div>
+              <span className="font-bold text-foreground text-lg group-hover:text-primary transition-colors">
+                CourtBook
+              </span>
+              <div className="text-xs text-muted-foreground font-medium">Boadilla</div>
+            </div>
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden md:flex items-center gap-2">
             {navItems.map((item) => (
               <Link key={item.href} href={item.href}>
                 <Button
@@ -50,8 +61,8 @@ export function Navigation() {
                   size="sm"
                   className={
                     pathname === item.href
-                      ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                      : "text-slate-600 hover:text-slate-800"
+                      ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-md font-semibold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-primary/10 font-medium"
                   }
                 >
                   {item.label}
@@ -60,12 +71,11 @@ export function Navigation() {
             ))}
           </div>
 
-          {/* Desktop Sign Out */}
           <Button
             variant="outline"
             size="sm"
             onClick={handleSignOut}
-            className="hidden md:flex border-slate-200 text-slate-600 hover:bg-slate-50 bg-transparent"
+            className="hidden md:flex border-primary/30 text-muted-foreground hover:bg-primary/10 hover:text-foreground hover:border-primary/50 bg-transparent font-medium"
           >
             Cerrar Sesión
           </Button>
@@ -75,15 +85,14 @@ export function Navigation() {
             variant="ghost"
             size="sm"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden text-slate-600"
+            className="md:hidden text-muted-foreground hover:text-foreground hover:bg-primary/10"
           >
             {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </Button>
         </div>
 
-        {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-slate-200 py-4 space-y-2">
+          <div className="md:hidden border-t border-primary/20 py-4 space-y-2 bg-card/95 backdrop-blur-sm">
             {navItems.map((item) => {
               const IconComponent = item.icon
               return (
@@ -91,10 +100,10 @@ export function Navigation() {
                   <Button
                     variant={pathname === item.href ? "default" : "ghost"}
                     size="sm"
-                    className={`w-full justify-start gap-3 ${
+                    className={`w-full justify-start gap-3 font-medium ${
                       pathname === item.href
-                        ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                        : "text-slate-600 hover:text-slate-800"
+                        ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-md"
+                        : "text-muted-foreground hover:text-foreground hover:bg-primary/10"
                     }`}
                   >
                     <IconComponent className="w-4 h-4" />
@@ -103,9 +112,9 @@ export function Navigation() {
                 </Link>
               )
             })}
-            
+
             {/* Mobile Sign Out */}
-            <div className="pt-2 border-t border-slate-200">
+            <div className="pt-2 border-t border-primary/20">
               <Button
                 variant="outline"
                 size="sm"
@@ -113,7 +122,7 @@ export function Navigation() {
                   handleSignOut()
                   closeMobileMenu()
                 }}
-                className="w-full justify-start gap-3 border-slate-200 text-slate-600 hover:bg-slate-50 bg-transparent"
+                className="w-full justify-start gap-3 border-primary/30 text-muted-foreground hover:bg-primary/10 hover:text-foreground bg-transparent font-medium"
               >
                 <LogOut className="w-4 h-4" />
                 Cerrar Sesión
